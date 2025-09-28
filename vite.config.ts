@@ -28,8 +28,8 @@ export default defineConfig(({ mode }) => {
       viteStaticCopy({
         targets: [
           {
-            src: "node_modules/@shoelace-style/shoelace/dist/assets",
-            dest: "shoelace",
+            src: "node_modules/@awesome.me/webawesome/dist",
+            dest: "webawesome",
           },
         ],
       }),

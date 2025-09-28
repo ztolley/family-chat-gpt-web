@@ -9,7 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@shoelace-style/shoelace": "^2.20.1",
+    "@awesome.me/webawesome": "^3.0.0-beta.6",
     "lit": "^3.3.1"
   },
   "devDependencies": {

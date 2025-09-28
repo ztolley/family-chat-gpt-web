@@ -1,12 +1,17 @@
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
+import "@awesome.me/webawesome/dist/components/avatar/avatar.js";
+import "@awesome.me/webawesome/dist/components/button/button.js";
+import "@awesome.me/webawesome/dist/components/divider/divider.js";
+import "@awesome.me/webawesome/dist/components/dropdown-item/dropdown-item.js";
+import "@awesome.me/webawesome/dist/components/dropdown/dropdown.js";
+import "@awesome.me/webawesome/dist/components/icon/icon.js";
 import type {
   AuthBackendProvider,
   GoogleCredentialResponse,
   StatusType,
   UserProfile,
 } from "@/types";
-
 import { authProvider, type AuthState } from "@/services/authProvider";
 import { fetchConfig } from "@/lib/authHelpers";
 
@@ -15,6 +20,7 @@ const MAX_GOOGLE_RETRIES = 20;
 @customElement("family-chat-login")
 export class FamilyChatLogin extends LitElement {
   @state() private hasSession = false;
+  @state() private profile: UserProfile | null = null;
   @state() private googleMessage: string | null = null;
   @state() private appleDisabled = false;
   @state() private appleLabel = "Sign in with Apple";
@@ -34,42 +40,62 @@ export class FamilyChatLogin extends LitElement {
       display: block;
     }
 
-    .panel {
-      background: white;
-      border-radius: 12px;
-      padding: 1.5rem;
-      box-shadow: 0 12px 32px rgba(15, 23, 42, 0.12);
+    .auth-controls {
       display: flex;
-      flex-direction: column;
-      gap: 1.5rem;
       align-items: center;
-      text-align: center;
+      gap: 0.75rem;
     }
 
-    .login-actions sl-button::part(base) {
-      width: 100%;
+    .login-buttons {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .google-button {
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
     .auth-message {
-      margin: 0;
-      font-size: 0.95rem;
-      color: #dc2626;
+      color: var(--wa-color-danger-500, #dc2626);
+      font-size: 0.75rem;
     }
 
-    .session-message {
-      margin: 0;
-    }
-
-    .session-actions {
+    .account-dropdown {
       display: flex;
-      justify-content: center;
-      width: 100%;
     }
 
-    @media (max-width: 600px) {
-      .panel {
-        padding: 1.5rem 1rem;
-      }
+    .avatar-trigger wa-avatar::part(base) {
+      border: 1px solid var(--wa-color-surface-border, #d5d8e0);
+    }
+
+    .account-menu {
+      display: flex;
+      flex-direction: column;
+      min-width: 200px;
+    }
+
+    .account-details {
+      padding: 0.5rem 0.75rem;
+      border-bottom: 1px solid var(--wa-color-surface-border, #d5d8e0);
+      margin-bottom: 0.25rem;
+      line-height: 1.4;
+    }
+
+    .account-details strong {
+      display: block;
+      font-size: 0.95rem;
+    }
+
+    .account-details span {
+      color: var(--wa-color-text-quiet, #64748b);
+      font-size: 0.8rem;
+    }
+
+    wa-dropdown-item::part(base) {
+      font-size: 0.9rem;
     }
   `;
 
@@ -92,46 +118,60 @@ export class FamilyChatLogin extends LitElement {
   }
 
   render() {
-    return this.hasSession ? this.renderSession() : this.renderLogin();
+    return html`
+      <div class="auth-controls">
+        ${this.hasSession ? this.renderSession() : this.renderLogin()}
+      </div>
+    `;
   }
 
   private renderLogin() {
     return html`
-      <section class="panel">
-        <div id="google-signin"></div>
+      <div class="login-buttons">
+        <div id="google-signin" class="google-button"></div>
         ${this.googleMessage
-          ? html`<p class="auth-message">${this.googleMessage}</p>`
+          ? html`<span class="auth-message">${this.googleMessage}</span>`
           : nothing}
-        <div class="login-actions">
-          <sl-button
-            id="apple-signin"
-            variant="default"
-            type="button"
-            size="medium"
-            ?disabled=${this.appleDisabled}
-            @click=${this.handleAppleClick}
-          >
-            ${this.appleLabel}
-          </sl-button>
-        </div>
-      </section>
+        <wa-button
+          variant="primary"
+          size="medium"
+          ?disabled=${this.appleDisabled}
+          @click=${this.handleAppleClick}
+        >
+          <wa-icon slot="prefix" name="brands:apple"></wa-icon>
+          ${this.appleLabel}
+        </wa-button>
+      </div>
     `;
   }
 
   private renderSession() {
+    const name = this.profile?.name ?? this.profile?.email ?? "Account";
+    const email = this.profile?.email ?? "";
+    const initials = this.getInitials(name);
+
     return html`
-      <section class="panel">
-        <p class="session-message">You are currently signed in.</p>
-        <div class="session-actions">
-          <sl-button
-            variant="text"
-            type="button"
-            @click=${this.handleLogoutClick}
-          >
-            Log out
-          </sl-button>
+      <wa-dropdown
+        class="account-dropdown"
+        distance="8"
+        @wa-select=${this.handleDropdownSelect}
+      >
+        <wa-button slot="trigger" variant="text" class="avatar-trigger">
+          <wa-avatar
+            initials=${initials}
+            label=${name}
+            shape="circle"
+            size="medium"
+          ></wa-avatar>
+        </wa-button>
+        <div class="account-menu">
+          <div class="account-details">
+            <strong>${name}</strong>
+            ${email ? html`<span>${email}</span>` : nothing}
+          </div>
+          <wa-dropdown-item value="logout">Log out</wa-dropdown-item>
         </div>
-      </section>
+      </wa-dropdown>
     `;
   }
 
@@ -139,13 +179,6 @@ export class FamilyChatLogin extends LitElement {
     authProvider.logout();
     this.googleMessage = null;
     this.appleLabel = "Sign in with Apple";
-    this.resetGoogleButton();
-    this.dispatchEvent(
-      new CustomEvent("auth-logout", {
-        bubbles: true,
-        composed: true,
-      }),
-    );
     this.emitStatus("Signed out.");
   }
 
@@ -179,6 +212,7 @@ export class FamilyChatLogin extends LitElement {
     const wasSession = this.hasSession;
     const hasSession = Boolean(state.token);
     this.hasSession = hasSession;
+    this.profile = state.profile;
     if (!state.token) {
       this.googleMessage = null;
       this.appleLabel = "Sign in with Apple";
@@ -337,6 +371,15 @@ export class FamilyChatLogin extends LitElement {
     }
   }
 
+  private handleDropdownSelect(event: CustomEvent<{ item: HTMLElement }>) {
+    const value = (
+      event.detail.item as HTMLElement | undefined
+    )?.getAttribute?.("value");
+    if (value === "logout") {
+      this.handleLogoutClick();
+    }
+  }
+
   private resetGoogleButton() {
     if (this.googleRetryHandle) {
       window.clearInterval(this.googleRetryHandle);
@@ -371,6 +414,17 @@ export class FamilyChatLogin extends LitElement {
         composed: true,
       }),
     );
+  }
+
+  private getInitials(value: string) {
+    return value
+      .split(" ")
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase() ?? "")
+      .join("")
+      .padEnd(2, "F")
+      .slice(0, 2);
   }
 }
 
