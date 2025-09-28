@@ -1,3 +1,4 @@
+import "@awesome.me/webawesome/dist/components/badge/badge.js";
 import { LitElement, css, html } from "lit";
 import { customElement, property } from "lit/decorators.js";
 
@@ -15,48 +16,38 @@ export class FamilyChatItemsHeader extends LitElement {
   static styles = css`
     :host {
       display: block;
-      border-bottom: 1px solid var(--fc-color-border-subtle);
-      padding-bottom: var(--fc-space-md);
+      border-bottom: 1px solid var(--wa-color-surface-border);
+      padding-bottom: var(--wa-space-m);
     }
 
     .items-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: var(--fc-space-md);
+      gap: var(--wa-space-m);
     }
 
     .items-heading {
       display: flex;
       flex-direction: column;
-      gap: var(--fc-space-2xs);
+      gap: var(--wa-space-xs);
     }
 
     .items-heading h2 {
       margin: 0;
-      font-size: var(--fc-font-size-lg);
-      font-weight: 600;
+      font-size: var(--wa-font-size-l);
+      font-weight: var(--wa-font-weight-bold);
     }
 
     .items-heading p {
       margin: 0;
-      color: var(--fc-color-text-secondary);
-      font-size: var(--fc-font-size-sm);
-    }
-
-    .items-count {
-      font-size: var(--fc-font-size-xs);
-      background: var(--fc-color-accent-soft);
-      color: var(--fc-color-text-badge);
-      padding: var(--fc-space-2xs) var(--fc-space-sm-inline);
-      border-radius: 999px;
-      font-weight: 600;
-      white-space: nowrap;
+      color: var(--wa-color-text-quiet);
+      font-size: var(--wa-font-size-s);
     }
 
     @media (max-width: 640px) {
       :host {
-        padding-bottom: var(--fc-space-sm);
+        padding-bottom: var(--wa-font-size-s);
       }
     }
   `;
@@ -70,7 +61,9 @@ export class FamilyChatItemsHeader extends LitElement {
           <h2>${this.heading}</h2>
           <p>${this.description}</p>
         </div>
-        <span class="items-count">${this.count} item${suffix}</span>
+        <wa-badge appearance="outlined" variant="neutral"
+          >${this.count} item${suffix}</wa-badge
+        >
       </header>
     `;
   }

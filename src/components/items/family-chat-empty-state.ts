@@ -13,11 +13,10 @@ export class FamilyChatEmptyState extends LitElement {
 
     .empty-state {
       text-align: center;
-      color: var(--fc-color-text-secondary);
-      padding: var(--fc-space-2xl-tight) var(--fc-space-md);
-      border: 1px dashed var(--fc-color-border);
-      border-radius: var(--fc-radius-md);
-      background: var(--fc-color-bg-empty);
+      color: var(--wa-color-text-quiet);
+      padding: var(--wa-space-xs) var(--wa-space-m);
+      border: 1px dashed var(--wa-color-surface-border);
+      border-radius: var(--wa-panel-border-radius);
     }
   `;
 

@@ -13,16 +13,19 @@ export class FamilyChatItemCard extends LitElement {
 
   static styles = css`
     :host {
-      display: block;
+      --color-bg-item: rgba(17, 24, 39, 0.65);
+      --color-bg-item-hover: rgba(17, 24, 39, 0.85);
+      --color-bg-empty: rgba(8, 12, 23, 0.65);
+      --color-scroll-thumb: rgba(99, 102, 241, 0.45);
     }
 
     .item-card {
       display: flex;
       justify-content: space-between;
-      gap: var(--fc-space-md);
-      padding: var(--fc-space-md) var(--fc-space-md-tight);
-      background: var(--fc-color-bg-item);
-      border-radius: var(--fc-radius-md);
+      gap: var(--wa-space-m);
+      padding: var(--wa-space-m) var(--wa-space-s);
+      background: var(--color-bg-item);
+      border-radius: var(--wa-panel-border-radius);
       border: 1px solid transparent;
       transition:
         border-color 0.25s ease,
@@ -30,40 +33,34 @@ export class FamilyChatItemCard extends LitElement {
     }
 
     .item-card:hover {
-      border-color: var(--fc-color-scroll-thumb);
-      background: var(--fc-color-bg-item-hover);
+      border-color: var(--color-scroll-thumb);
+      background: var(--color-bg-item-hover);
     }
 
     .item-info {
       display: flex;
       flex-direction: column;
-      gap: var(--fc-space-2xs);
+      gap: var(--wa-space-xs);
     }
 
     .item-title {
       margin: 0;
-      font-size: var(--fc-font-size-base);
-      font-weight: 600;
-      color: var(--fc-color-text-strong);
+      color: var(--wa-color-text-loud);
     }
 
     .item-description {
       margin: 0;
-      color: var(--fc-color-text-soft);
-      font-size: var(--fc-font-size-sm);
-      line-height: var(--fc-line-height-relaxed);
+      color: var(--wa-color-text-quiet);
+      font-size: var(--wa-font-size-s);
+      line-height: var(--wa-line-height-condensed);
       white-space: pre-line;
     }
 
     .item-actions {
       display: flex;
-      gap: var(--fc-space-xs);
+      gap: var(--wa-space-s);
       align-items: center;
       flex-wrap: wrap;
-    }
-
-    .item-actions wa-button::part(base) {
-      padding: var(--fc-space-2xs) var(--fc-space-sm);
     }
   `;
 
@@ -106,23 +103,11 @@ export class FamilyChatItemCard extends LitElement {
   }
 
   private handleEdit() {
-    this.dispatchEvent(
-      new CustomEvent<Item>("item-edit", {
-        detail: this.item,
-        bubbles: true,
-        composed: true,
-      }),
-    );
+    // Talk to store direct, not using events
   }
 
   private handleDelete() {
-    this.dispatchEvent(
-      new CustomEvent<Item>("item-delete", {
-        detail: this.item,
-        bubbles: true,
-        composed: true,
-      }),
-    );
+    // Talk to store direct, not using events
   }
 }
 

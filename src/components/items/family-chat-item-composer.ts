@@ -1,4 +1,6 @@
 import "@awesome.me/webawesome/dist/components/button/button.js";
+import "@awesome.me/webawesome/dist/components/input/input.js";
+import "@awesome.me/webawesome/dist/components/textarea/textarea.js";
 import { LitElement, css, html } from "lit";
 import { customElement, property, query } from "lit/decorators.js";
 
@@ -23,38 +25,28 @@ export class FamilyChatItemComposer extends LitElement {
       display: block;
       position: sticky;
       bottom: 0;
-      margin-top: var(--fc-space-xs);
-      padding-top: var(--fc-space-md-plus);
-      border-top: 1px solid var(--fc-color-border);
-      background: var(--fc-gradient-composer);
+      margin-top: var(--wa-space-xs);
+      padding-top: var(--wa-space-m);
+      border-top: 1px solid var(--wa-color-surface-border);
     }
 
     form {
       display: flex;
       flex-direction: column;
-      gap: var(--fc-space-sm);
+      gap: var(--wa-space-sm);
     }
 
     .composer-inputs {
       display: flex;
       flex-wrap: wrap;
-      gap: var(--fc-space-sm);
+      gap: var(--wa-space-sm);
     }
 
-    .composer-inputs input,
-    .composer-inputs textarea {
-      flex: 1 1 240px;
-      padding: var(--fc-space-sm-tight) var(--fc-space-sm);
-      border: 1px solid var(--fc-color-border-strong);
-      border-radius: var(--fc-radius-sm);
-      font-size: var(--fc-font-size-input);
-      font-family: inherit;
-      background: var(--fc-color-bg-panel);
-      color: var(--fc-color-text-strong);
+    .composer-inputs > * {
+      flex-grow: 1;
     }
 
     .composer-inputs textarea {
-      min-height: var(--fc-composer-textarea-min-height);
       resize: vertical;
     }
 
@@ -64,12 +56,12 @@ export class FamilyChatItemComposer extends LitElement {
     }
 
     .composer-actions wa-button::part(base) {
-      padding-inline: var(--fc-space-lg);
+      padding-inline: var(--wa-space-l);
     }
 
     @media (max-width: 640px) {
       :host {
-        padding-top: var(--fc-space-sm);
+        padding-top: var(--wa-space-sm);
       }
 
       .composer-inputs {
@@ -87,16 +79,20 @@ export class FamilyChatItemComposer extends LitElement {
     return html`
       <form @submit=${this.handleSubmit}>
         <div class="composer-inputs">
-          <input
-            id="item-title"
-            type="text"
-            placeholder="Add something new…"
-            required
-          />
-          <textarea
-            id="item-description"
-            placeholder="Add a note (optional)"
-          ></textarea>
+          <div>
+            <wa-input
+              id="item-title"
+              type="text"
+              placeholder="Add something new…"
+              required
+            ></wa-input>
+          </div>
+          <div>
+            <wa-textarea
+              id="item-description"
+              placeholder="Add a note (optional)"
+            ></wa-textarea>
+          </div>
         </div>
         <div class="composer-actions">
           <wa-button

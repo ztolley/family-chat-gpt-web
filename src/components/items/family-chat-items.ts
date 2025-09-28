@@ -1,22 +1,20 @@
 import { LitElement, css, html, nothing } from "lit";
-import { repeat } from "lit/directives/repeat.js";
 import { customElement, query, state } from "lit/decorators.js";
-import { authProvider, type AuthState } from "@/services/authProvider";
+import { repeat } from "lit/directives/repeat.js";
+import { SignalWatcher } from "@lit-labs/preact-signals";
+import { effect } from "@preact/signals-core";
 import {
-  createItem,
-  deleteItem,
-  listItems,
-  updateItem,
-} from "@/services/itemsService";
-import type { Item, StatusType } from "@/types";
-import "../family-chat-empty-state";
-import "./family-chat-item-card";
-import "./family-chat-item-composer";
-import "./family-chat-items-header";
+  authTokenSignal,
+  isAuthenticatedSignal,
+} from "@/services/authProvider";
+import { createItem, listItems } from "@/services/itemsService";
+import type { Item } from "@/types";
 import type { FamilyChatItemComposer } from "./family-chat-item-composer";
 
+const SignalElement = SignalWatcher(LitElement) as typeof LitElement;
+
 @customElement("family-chat-items")
-export class FamilyChatItems extends LitElement {
+export class FamilyChatItems extends SignalElement {
   @state() private authToken: string | null = null;
   @state() private items: Item[] = [];
   @state() private loading = false;
@@ -25,7 +23,22 @@ export class FamilyChatItems extends LitElement {
   @query("family-chat-item-composer")
   private composer?: FamilyChatItemComposer;
 
-  private unsubscribeAuth?: () => void;
+  private disposeEffect?: () => void;
+
+  connectedCallback() {
+    super.connectedCallback();
+    this.disposeEffect = effect(() => {
+      const token = authTokenSignal.value;
+      if (token !== this.authToken) {
+        this.handleTokenChange(token);
+      }
+    });
+  }
+
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    this.disposeEffect?.();
+  }
 
   static styles = css`
     :host {
@@ -39,12 +52,8 @@ export class FamilyChatItems extends LitElement {
       min-height: 0;
       display: flex;
       flex-direction: column;
-      gap: var(--fc-space-md-plus);
-      padding: var(--fc-space-xl);
-      border-radius: var(--fc-radius-lg);
-      background: var(--fc-color-bg-panel);
-      box-shadow: var(--fc-shadow-panel);
-      border: 1px solid var(--fc-color-border-accent);
+      gap: var(--wa-space-m);
+      padding: var(--wa-space-xl);
     }
 
     .items-list {
@@ -53,38 +62,18 @@ export class FamilyChatItems extends LitElement {
       overflow-y: auto;
       display: flex;
       flex-direction: column;
-      gap: var(--fc-space-sm-plus);
-      padding-right: var(--fc-space-3xs);
-    }
-
-    .items-list::-webkit-scrollbar {
-      width: var(--fc-size-scrollbar);
-    }
-
-    .items-list::-webkit-scrollbar-thumb {
-      background: var(--fc-color-scroll-thumb);
-      border-radius: 999px;
+      gap: var(--wa-space-s);
     }
 
     @media (max-width: 640px) {
       .items-shell {
-        padding: var(--fc-space-md-plus);
+        padding: var(--wa-space-m);
       }
     }
   `;
 
-  connectedCallback() {
-    super.connectedCallback();
-    this.unsubscribeAuth = authProvider.subscribe(this.handleAuthChange);
-  }
-
-  disconnectedCallback() {
-    super.disconnectedCallback();
-    this.unsubscribeAuth?.();
-  }
-
   render() {
-    if (!this.authToken) {
+    if (!isAuthenticatedSignal.value || !this.authToken) {
       return nothing;
     }
 
@@ -104,36 +93,27 @@ export class FamilyChatItems extends LitElement {
     `;
   }
 
-  private handleAuthChange = (state: AuthState) => {
-    const previousToken = this.authToken;
-    this.authToken = state.token;
+  private async handleTokenChange(token: string | null) {
+    this.authToken = token;
+    this.items = [];
+    this.loading = false;
+    this.saving = false;
 
-    if (!this.authToken) {
-      this.items = [];
-      this.loading = false;
-      this.saving = false;
-      return;
-    }
-
-    if (this.authToken !== previousToken) {
-      void this.loadItems();
-    }
-  };
-
-  private async loadItems() {
-    const token = this.authToken;
     if (!token) {
       return;
     }
 
+    await this.loadItems(token);
+  }
+
+  private async loadItems(token: string) {
     this.loading = true;
     try {
       this.items = await listItems(token);
-      this.dispatchStatus("Items loaded.", "success");
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Unable to load items.";
-      this.dispatchStatus(message, "error");
+      console.error(message);
     } finally {
       this.loading = false;
     }
@@ -144,7 +124,6 @@ export class FamilyChatItems extends LitElement {
   ) {
     const token = this.authToken;
     if (!token) {
-      this.dispatchStatus("Not authenticated.", "error");
       return;
     }
 
@@ -152,7 +131,6 @@ export class FamilyChatItems extends LitElement {
     const description = event.detail.description.trim();
 
     if (!title) {
-      this.dispatchStatus("Please provide a title.", "error");
       this.composer?.focusTitle();
       return;
     }
@@ -164,72 +142,12 @@ export class FamilyChatItems extends LitElement {
         description: description || undefined,
       });
       this.composer?.resetFields();
-      this.dispatchStatus("Item added.", "success");
-      await this.loadItems();
+
+      await this.loadItems(token);
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Failed to add item.";
-      this.dispatchStatus(message, "error");
+      console.error(error);
     } finally {
       this.saving = false;
-    }
-  }
-
-  private async handleItemEdit(event: CustomEvent<Item>) {
-    const item = event.detail;
-    const token = this.authToken;
-    if (!token) {
-      this.dispatchStatus("Not authenticated.", "error");
-      return;
-    }
-
-    const newTitle = prompt("Update the item title", item.title);
-    if (newTitle === null) {
-      return;
-    }
-
-    const newDescription = prompt(
-      "Update the description (optional)",
-      item.description ?? "",
-    );
-
-    try {
-      this.dispatchStatus("Saving changes…");
-      await updateItem(token, item.id, {
-        title: newTitle.trim(),
-        description: newDescription?.trim() || undefined,
-      });
-      this.dispatchStatus("Item updated.", "success");
-      await this.loadItems();
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Failed to update item.";
-      this.dispatchStatus(message, "error");
-    }
-  }
-
-  private async handleItemDelete(event: CustomEvent<Item>) {
-    const item = event.detail;
-    const token = this.authToken;
-    if (!token) {
-      this.dispatchStatus("Not authenticated.", "error");
-      return;
-    }
-
-    const confirmed = confirm("Delete this item?");
-    if (!confirmed) {
-      return;
-    }
-
-    try {
-      this.dispatchStatus("Deleting item…");
-      await deleteItem(token, item.id);
-      this.dispatchStatus("Item deleted.", "success");
-      await this.loadItems();
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Failed to delete item.";
-      this.dispatchStatus(message, "error");
     }
   }
 
@@ -250,21 +168,7 @@ export class FamilyChatItems extends LitElement {
       this.items,
       (item) => item.id,
       (item) =>
-        html`<family-chat-item-card
-          .item=${item}
-          @item-edit=${this.handleItemEdit}
-          @item-delete=${this.handleItemDelete}
-        ></family-chat-item-card>`,
-    );
-  }
-
-  private dispatchStatus(message: string | null, type: StatusType = "") {
-    this.dispatchEvent(
-      new CustomEvent("items-status", {
-        detail: { message, type },
-        bubbles: true,
-        composed: true,
-      }),
+        html`<family-chat-item-card .item=${item}></family-chat-item-card>`,
     );
   }
 }

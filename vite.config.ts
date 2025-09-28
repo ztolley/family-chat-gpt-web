@@ -48,6 +48,11 @@ export default defineConfig(({ mode }) => {
           secure: false,
           target: "http://localhost:3000",
         },
+        "/auth": {
+          changeOrigin: true,
+          secure: false,
+          target: "http://localhost:3000",
+        },
         "/config": {
           changeOrigin: true,
           secure: false,
