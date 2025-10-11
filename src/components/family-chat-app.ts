@@ -3,7 +3,7 @@ import "@awesome.me/webawesome/dist/components/icon/icon.js";
 import "@awesome.me/webawesome/dist/components/card/card.js";
 import { LitElement, css, html } from "lit";
 import { customElement } from "lit/decorators.js";
-import { SignalWatcher } from "@lit-labs/preact-signals";
+import { SignalWatcher } from "@lit-labs/signals";
 import {
   authProfileSignal,
   isAuthenticatedSignal,
@@ -99,8 +99,8 @@ export class FamilyChatApp extends SignalElement {
   `;
 
   render() {
-    const isAuthenticated = isAuthenticatedSignal.value;
-    const profile = authProfileSignal.value;
+    const isAuthenticated = isAuthenticatedSignal.get();
+    const profile = authProfileSignal.get();
 
     return html`
       <div class="app-shell">

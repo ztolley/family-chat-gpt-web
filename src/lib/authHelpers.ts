@@ -57,8 +57,8 @@ export function deriveProfile(
 
 export function saveSession(token: string, profile: UserProfile) {
   try {
-    sessionStorage.setItem(TOKEN_STORAGE_KEY, token);
-    sessionStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(profile));
+    localStorage.setItem(TOKEN_STORAGE_KEY, token);
+    localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(profile));
   } catch {
     // Ignore storage errors; session persistence is best-effort.
   }
@@ -66,20 +66,22 @@ export function saveSession(token: string, profile: UserProfile) {
 
 export function clearSession() {
   try {
-    sessionStorage.removeItem(TOKEN_STORAGE_KEY);
-    sessionStorage.removeItem(PROFILE_STORAGE_KEY);
+    localStorage.removeItem(TOKEN_STORAGE_KEY);
+    localStorage.removeItem(PROFILE_STORAGE_KEY);
   } catch {
     // Ignore storage errors.
   }
 }
 
 export function restoreSession(): {
-  token: string;
+  token: string | null;
   profile: UserProfile;
+  provider: AuthBackendProvider;
+  expired: boolean;
 } | null {
   let storedToken: string | null;
   try {
-    storedToken = sessionStorage.getItem(TOKEN_STORAGE_KEY);
+    storedToken = localStorage.getItem(TOKEN_STORAGE_KEY);
   } catch {
     storedToken = null;
   }
@@ -89,30 +91,51 @@ export function restoreSession(): {
   }
 
   const payload = decodeJwt(storedToken);
-  if (isTokenExpired(payload)) {
-    clearSession();
-    return null;
-  }
+  const expired = isTokenExpired(payload);
+  const derivedFromPayload = (
+    payload?.iss?.includes("apple") ? "apple" : "google"
+  ) as AuthBackendProvider;
 
   let storedProfile: UserProfile | null = null;
+  let storedProvider: AuthBackendProvider | null = null;
   try {
-    const rawProfile = sessionStorage.getItem(PROFILE_STORAGE_KEY);
+    const rawProfile = localStorage.getItem(PROFILE_STORAGE_KEY);
     storedProfile = rawProfile ? (JSON.parse(rawProfile) as UserProfile) : null;
+    storedProvider =
+      (storedProfile?.provider as AuthBackendProvider | undefined) ?? null;
   } catch {
     storedProfile = null;
   }
 
-  if (storedProfile) {
-    return { token: storedToken, profile: storedProfile };
+  if (storedProfile && !storedProvider) {
+    storedProvider = derivedFromPayload;
+    storedProfile = {
+      ...storedProfile,
+      provider: derivedFromPayload,
+    };
   }
 
-  const provider = (
-    payload?.iss?.includes("apple") ? "apple" : "google"
-  ) as AuthBackendProvider;
-  const profile = {
-    provider,
-    email: payload?.email,
-    name: payload?.name,
-  };
-  return { token: storedToken, profile };
+  if (!storedProfile) {
+    storedProvider = derivedFromPayload;
+    storedProfile = {
+      provider: derivedFromPayload,
+      email: payload?.email,
+      name: payload?.name,
+    };
+  }
+
+  if (storedProfile) {
+    const provider =
+      storedProvider ??
+      (storedProfile.provider as AuthBackendProvider | undefined) ??
+      derivedFromPayload;
+
+    return {
+      token: expired ? null : storedToken,
+      profile: { ...storedProfile, provider },
+      provider,
+      expired,
+    };
+  }
+  return null;
 }

@@ -1,4 +1,4 @@
-import { signal, computed, batch } from "@preact/signals-core";
+import { signal, computed } from "@lit-labs/signals";
 import {
   clearSession,
   deriveProfile,
@@ -12,41 +12,49 @@ export const authProfileSignal = signal<UserProfile | null>(null);
 export const authProviderSignal = signal<AuthBackendProvider | null>(null);
 
 export const isAuthenticatedSignal = computed(
-  () => authTokenSignal.value !== null,
+  () => authTokenSignal.get() !== null,
 );
 
 export function setAuthSession(provider: AuthBackendProvider, token: string) {
   const profile = deriveProfile(provider, token);
-  batch(() => {
-    authTokenSignal.value = token;
-    authProfileSignal.value = profile;
-    authProviderSignal.value = provider;
-  });
+  authTokenSignal.set(token);
+  authProfileSignal.set(profile);
+  authProviderSignal.set(provider);
   saveSession(token, profile);
 }
 
 export function clearAuthSession() {
   clearSession();
-  batch(() => {
-    authTokenSignal.value = null;
-    authProfileSignal.value = null;
-    authProviderSignal.value = null;
-  });
+  authTokenSignal.set(null);
+  authProfileSignal.set(null);
+  authProviderSignal.set(null);
 }
 
 export function restoreAuthSession() {
   const restored = restoreSession();
-  if (restored) {
-    batch(() => {
-      const provider = restored.profile.provider as AuthBackendProvider;
-      authTokenSignal.value = restored.token;
-      authProfileSignal.value = restored.profile;
-      authProviderSignal.value = provider;
-    });
-    return true;
+  if (!restored) {
+    clearAuthSession();
+    return "none" as const;
   }
-  clearAuthSession();
-  return false;
+
+  const { token, profile, provider, expired } = restored;
+
+  if (!profile || !provider) {
+    clearAuthSession();
+    return "none" as const;
+  }
+
+  if (!expired && token) {
+    authTokenSignal.set(token);
+    authProfileSignal.set(profile);
+    authProviderSignal.set(provider);
+    return "restored" as const;
+  }
+
+  authTokenSignal.set(null);
+  authProfileSignal.set(null);
+  authProviderSignal.set(provider);
+  return "refresh-needed" as const;
 }
 
 // Restore once at module evaluation.

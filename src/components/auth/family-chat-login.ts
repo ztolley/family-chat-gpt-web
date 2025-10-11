@@ -3,17 +3,20 @@ import "@awesome.me/webawesome/dist/components/button/button.js";
 import "@awesome.me/webawesome/dist/components/dropdown-item/dropdown-item.js";
 import "@awesome.me/webawesome/dist/components/dropdown/dropdown.js";
 import { LitElement, css, html, nothing } from "lit";
-import { SignalWatcher } from "@lit-labs/preact-signals";
+import { SignalWatcher } from "@lit-labs/signals";
 import { customElement, query, state } from "lit/decorators.js";
-import { effect } from "@preact/signals-core";
-import { fetchConfig } from "@/lib/authHelpers";
+import { effect } from "@/lib/signalHelpers";
 import {
   authProfileSignal,
   authTokenSignal,
   clearAuthSession,
 } from "@/services/authProvider";
+import {
+  ensureGoogleConfigLoaded,
+  googleClientIdSignal,
+  googleConfigErrorSignal,
+} from "@/services/authSessionManager";
 import type { UserProfile } from "@/types";
-import "./family-chat-google-auth";
 import type { FamilyChatGoogleAuth } from "./family-chat-google-auth";
 
 const SignalElement = SignalWatcher(LitElement) as typeof LitElement;
@@ -27,7 +30,7 @@ export class FamilyChatLogin extends SignalElement {
 
   private googleButtonReady = false;
   private lastRenderedClientId: string | null = null;
-  private disposeAuthEffect?: () => void;
+  private disposeSignalsEffect?: () => void;
 
   static styles = css`
     :host {
@@ -97,9 +100,21 @@ export class FamilyChatLogin extends SignalElement {
 
   connectedCallback() {
     super.connectedCallback();
-    this.disposeAuthEffect = effect(() => {
-      const token = authTokenSignal.value;
-      if (!token && this.googleClientId) {
+    this.disposeSignalsEffect = effect(() => {
+      const clientId = googleClientIdSignal.get();
+      const error = googleConfigErrorSignal.get();
+      if (this.googleClientId !== clientId) {
+        this.googleClientId = clientId;
+        this.googleButtonReady = false;
+        this.lastRenderedClientId = null;
+        void this.updateComplete.then(() => this.tryRenderGoogleButton());
+      }
+      if (this.googleError !== error) {
+        this.googleError = error;
+      }
+
+      const token = authTokenSignal.get();
+      if (!token && clientId) {
         this.googleButtonReady = false;
         void this.updateComplete.then(() => this.tryRenderGoogleButton());
       }
@@ -108,18 +123,20 @@ export class FamilyChatLogin extends SignalElement {
 
   disconnectedCallback() {
     super.disconnectedCallback();
-    this.disposeAuthEffect?.();
+    this.disposeSignalsEffect?.();
   }
 
   async firstUpdated() {
-    await this.loadConfig();
+    await ensureGoogleConfigLoaded();
+    this.googleClientId = googleClientIdSignal.get();
+    this.googleError = googleConfigErrorSignal.get();
     await this.updateComplete;
     this.tryRenderGoogleButton();
   }
 
   render() {
-    const token = authTokenSignal.value;
-    const profile = authProfileSignal.value;
+    const token = authTokenSignal.get();
+    const profile = authProfileSignal.get();
 
     return html`
       <div class="auth-controls">
@@ -180,32 +197,12 @@ export class FamilyChatLogin extends SignalElement {
     `;
   }
 
-  private async loadConfig() {
-    try {
-      const config = await fetchConfig();
-      this.googleClientId = config.googleClientId ?? null;
-      if (!this.googleClientId) {
-        this.googleError = "Google Sign-In is not configured.";
-      } else {
-        this.googleError = null;
-        this.googleButtonReady = false;
-        this.lastRenderedClientId = null;
-      }
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Unable to load configuration.";
-      this.googleError = message;
-    }
-  }
-
   private tryRenderGoogleButton() {
     if (
       !this.googleTarget ||
       !this.googleAuth ||
       !this.googleClientId ||
-      authTokenSignal.value
+      authTokenSignal.get()
     ) {
       return;
     }

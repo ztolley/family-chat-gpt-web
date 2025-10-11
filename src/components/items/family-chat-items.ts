@@ -1,8 +1,8 @@
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 import { repeat } from "lit/directives/repeat.js";
-import { SignalWatcher } from "@lit-labs/preact-signals";
-import { effect } from "@preact/signals-core";
+import { SignalWatcher } from "@lit-labs/signals";
+import { effect } from "@/lib/signalHelpers";
 import {
   authTokenSignal,
   isAuthenticatedSignal,
@@ -28,7 +28,7 @@ export class FamilyChatItems extends SignalElement {
   connectedCallback() {
     super.connectedCallback();
     this.disposeEffect = effect(() => {
-      const token = authTokenSignal.value;
+      const token = authTokenSignal.get();
       if (token !== this.authToken) {
         this.handleTokenChange(token);
       }
@@ -73,7 +73,7 @@ export class FamilyChatItems extends SignalElement {
   `;
 
   render() {
-    if (!isAuthenticatedSignal.value || !this.authToken) {
+    if (!isAuthenticatedSignal.get() || !this.authToken) {
       return nothing;
     }
 

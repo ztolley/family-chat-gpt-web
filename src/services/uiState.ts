@@ -1,15 +1,15 @@
-import { signal } from "@preact/signals-core";
+import { signal } from "@lit-labs/signals";
 
 export const sidebarOpenSignal = signal(false);
 
 export const openSidebar = () => {
-  sidebarOpenSignal.value = true;
+  sidebarOpenSignal.set(true);
 };
 
 export const closeSidebar = () => {
-  sidebarOpenSignal.value = false;
+  sidebarOpenSignal.set(false);
 };
 
 export const toggleSidebar = () => {
-  sidebarOpenSignal.value = !sidebarOpenSignal.value;
+  sidebarOpenSignal.set(!sidebarOpenSignal.get());
 };

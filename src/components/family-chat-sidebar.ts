@@ -2,7 +2,7 @@ import "@awesome.me/webawesome/dist/components/drawer/drawer.js";
 import "@awesome.me/webawesome/dist/components/card/card.js";
 import { LitElement, css, html } from "lit";
 import { customElement, property } from "lit/decorators.js";
-import { SignalWatcher } from "@lit-labs/preact-signals";
+import { SignalWatcher } from "@lit-labs/signals";
 import { closeSidebar, sidebarOpenSignal } from "@/services/uiState";
 import type { UserProfile } from "@/types";
 
@@ -41,7 +41,7 @@ export class FamilyChatSidebar extends SignalElement {
   `;
 
   render() {
-    const open = sidebarOpenSignal.value;
+    const open = sidebarOpenSignal.get();
 
     return html`
       <aside class="sidebar-base desktop">${this.renderSidebarContent()}</aside>
