@@ -1,9 +1,4 @@
-import type {
-  AuthBackendProvider,
-  ConfigResponse,
-  JWTPayload,
-  UserProfile,
-} from "@/types";
+import type { ConfigResponse, JWTPayload, UserProfile } from "@/types";
 
 export const TOKEN_STORAGE_KEY = "familychat_token";
 export const PROFILE_STORAGE_KEY = "familychat_profile";
@@ -43,13 +38,10 @@ export function isTokenExpired(payload: JWTPayload | null): boolean {
   return payload.exp <= nowSeconds;
 }
 
-export function deriveProfile(
-  provider: AuthBackendProvider,
-  token: string,
-): UserProfile {
+export function deriveProfile(token: string): UserProfile {
   const payload = decodeJwt(token) ?? {};
   return {
-    provider,
+    provider: "google",
     email: payload.email,
     name: payload.name,
   };
@@ -76,7 +68,6 @@ export function clearSession() {
 export function restoreSession(): {
   token: string | null;
   profile: UserProfile;
-  provider: AuthBackendProvider;
   expired: boolean;
 } | null {
   let storedToken: string | null;
@@ -92,50 +83,26 @@ export function restoreSession(): {
 
   const payload = decodeJwt(storedToken);
   const expired = isTokenExpired(payload);
-  const derivedFromPayload = (
-    payload?.iss?.includes("apple") ? "apple" : "google"
-  ) as AuthBackendProvider;
 
   let storedProfile: UserProfile | null = null;
-  let storedProvider: AuthBackendProvider | null = null;
   try {
     const rawProfile = localStorage.getItem(PROFILE_STORAGE_KEY);
     storedProfile = rawProfile ? (JSON.parse(rawProfile) as UserProfile) : null;
-    storedProvider =
-      (storedProfile?.provider as AuthBackendProvider | undefined) ?? null;
   } catch {
     storedProfile = null;
   }
 
-  if (storedProfile && !storedProvider) {
-    storedProvider = derivedFromPayload;
-    storedProfile = {
-      ...storedProfile,
-      provider: derivedFromPayload,
-    };
-  }
+  const profile = storedProfile
+    ? { ...storedProfile, provider: "google" }
+    : {
+        provider: "google",
+        email: payload?.email,
+        name: payload?.name,
+      };
 
-  if (!storedProfile) {
-    storedProvider = derivedFromPayload;
-    storedProfile = {
-      provider: derivedFromPayload,
-      email: payload?.email,
-      name: payload?.name,
-    };
-  }
-
-  if (storedProfile) {
-    const provider =
-      storedProvider ??
-      (storedProfile.provider as AuthBackendProvider | undefined) ??
-      derivedFromPayload;
-
-    return {
-      token: expired ? null : storedToken,
-      profile: { ...storedProfile, provider },
-      provider,
-      expired,
-    };
-  }
-  return null;
+  return {
+    token: expired ? null : storedToken,
+    profile,
+    expired,
+  };
 }

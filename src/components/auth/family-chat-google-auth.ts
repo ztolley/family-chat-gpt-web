@@ -28,7 +28,7 @@ export class FamilyChatGoogleAuth extends LitElement {
       callback: (response: GoogleCredentialResponse) => {
         const token = response.credential;
         if (token) {
-          setAuthSession("google", token);
+          setAuthSession(token);
         }
       },
     });

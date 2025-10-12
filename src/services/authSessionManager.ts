@@ -3,12 +3,11 @@ import { effect } from "@/lib/signalHelpers";
 import { decodeJwt, fetchConfig, isTokenExpired } from "@/lib/authHelpers";
 import { fetchGoogleCredential } from "@/lib/googleIdentity";
 import {
-  authProviderSignal,
+  authProfileSignal,
   authTokenSignal,
   clearAuthSession,
   setAuthSession,
 } from "./authProvider";
-import type { AuthBackendProvider } from "@/types";
 
 const REFRESH_LEAD_MS = 2 * 60 * 1000;
 const MIN_REFRESH_DELAY_MS = 5 * 1000;
@@ -65,19 +64,17 @@ async function refreshGoogleToken() {
     autoSelect: true,
   });
 
-  setAuthSession("google", token);
+  setAuthSession(token);
 }
 
-async function refreshAuthToken(provider: AuthBackendProvider | null) {
-  if (refreshing || !provider) {
+async function refreshAuthToken() {
+  if (refreshing) {
     return;
   }
 
   refreshing = true;
   try {
-    if (provider === "google") {
-      await refreshGoogleToken();
-    }
+    await refreshGoogleToken();
   } catch (error) {
     console.error(error);
     clearAuthSession();
@@ -86,13 +83,10 @@ async function refreshAuthToken(provider: AuthBackendProvider | null) {
   }
 }
 
-function scheduleTokenRefresh(
-  token: string | null,
-  provider: AuthBackendProvider | null,
-) {
+function scheduleTokenRefresh(token: string | null) {
   clearRefreshTimer();
 
-  if (!token || provider !== "google") {
+  if (!token) {
     return;
   }
 
@@ -103,7 +97,7 @@ function scheduleTokenRefresh(
   }
 
   if (isTokenExpired(payload)) {
-    void refreshAuthToken(provider);
+    void refreshAuthToken();
     return;
   }
 
@@ -112,7 +106,7 @@ function scheduleTokenRefresh(
   const triggerAt = expiresAt - REFRESH_LEAD_MS;
 
   if (triggerAt <= now) {
-    void refreshAuthToken(provider);
+    void refreshAuthToken();
     return;
   }
 
@@ -124,7 +118,7 @@ function scheduleTokenRefresh(
     if (authTokenSignal.get() !== scheduledToken) {
       return;
     }
-    void refreshAuthToken(provider);
+    void refreshAuthToken();
   }, delay);
 }
 
@@ -136,12 +130,12 @@ function startAuthWatchers() {
 
   effect(() => {
     const token = authTokenSignal.get();
-    const provider = authProviderSignal.get();
+    const profile = authProfileSignal.get();
 
-    scheduleTokenRefresh(token, provider);
+    scheduleTokenRefresh(token);
 
-    if (!token && provider === "google") {
-      void refreshAuthToken(provider);
+    if (!token && profile) {
+      void refreshAuthToken();
     }
   });
 }
