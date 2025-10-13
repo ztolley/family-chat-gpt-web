@@ -34,8 +34,10 @@ export function deriveProfile(token: string): UserProfile {
   const payload = decodeJwt(token) ?? {};
   return {
     provider: "google",
+    subject: payload.sub,
     email: payload.email,
     name: payload.name,
+    pictureUrl: payload.picture,
   };
 }
 

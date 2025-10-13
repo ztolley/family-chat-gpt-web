@@ -1,5 +1,3 @@
-import "@awesome.me/webawesome/dist/components/avatar/avatar.js";
-import "@awesome.me/webawesome/dist/components/button/button.js";
 import "@awesome.me/webawesome/dist/components/dropdown-item/dropdown-item.js";
 import "@awesome.me/webawesome/dist/components/dropdown/dropdown.js";
 import { LitElement, css, html, nothing } from "lit";
@@ -143,6 +141,47 @@ export class FamilyChatLogin extends SignalElement {
       display: flex;
     }
 
+    .avatar-trigger {
+      all: unset;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    .avatar-trigger:focus-visible {
+      outline: 2px solid var(--wa-color-brand-500, #2563eb);
+      outline-offset: 2px;
+      border-radius: 9999px;
+    }
+
+    .avatar {
+      position: relative;
+      width: 2.5rem;
+      height: 2.5rem;
+      border-radius: 50%;
+      background: var(--wa-color-surface-raised, #f1f5f9);
+      color: var(--wa-color-text-strong, #0f172a);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      font-size: 1rem;
+    }
+
+    .avatar-image {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+
+    .avatar-initials {
+      letter-spacing: 0.01em;
+    }
+
     .account-menu {
       display: flex;
       flex-direction: column;
@@ -268,6 +307,7 @@ export class FamilyChatLogin extends SignalElement {
     const name = profile.name ?? profile.email ?? "Account";
     const email = profile.email ?? "";
     const initials = this.getInitials(name);
+    const picture = this.getProfileImage(profile);
 
     return html`
       <wa-dropdown
@@ -275,14 +315,25 @@ export class FamilyChatLogin extends SignalElement {
         distance="8"
         @wa-select=${this.handleDropdownSelect}
       >
-        <wa-button slot="trigger" variant="neutral" class="avatar-trigger">
-          <wa-avatar
-            initials=${initials}
-            label=${name}
-            shape="circle"
-            size="medium"
-          ></wa-avatar>
-        </wa-button>
+        <button
+          slot="trigger"
+          type="button"
+          class="avatar-trigger"
+          aria-label=${name}
+        >
+          <span class="avatar" aria-hidden="true">
+            ${picture
+              ? html`<img
+                  class="avatar-image"
+                  src=${picture}
+                  referrerpolicy="no-referrer"
+                  crossorigin="anonymous"
+                  alt=""
+                  decoding="async"
+                />`
+              : html`<span class="avatar-initials">${initials}</span>`}
+          </span>
+        </button>
         <div class="account-menu">
           <div class="account-details">
             <strong>${name}</strong>
@@ -356,6 +407,18 @@ export class FamilyChatLogin extends SignalElement {
       .join("")
       .padEnd(2, "F")
       .slice(0, 2);
+  }
+
+  private getProfileImage(profile: UserProfile): string | undefined {
+    if (profile.pictureUrl) {
+      return profile.pictureUrl;
+    }
+
+    if (profile.provider === "google" && profile.subject) {
+      return `https://profiles.google.com/s2/photos/profile/${profile.subject}?sz=96`;
+    }
+
+    return undefined;
   }
 }
 
