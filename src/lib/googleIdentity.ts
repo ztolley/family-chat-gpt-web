@@ -4,6 +4,9 @@ const POLL_INTERVAL_MS = 200;
 const MAX_ATTEMPTS = 20;
 const DEFAULT_CODE_TIMEOUT_MS = 60000;
 
+let oauthModule: GoogleOAuthModule | null = null;
+let oauthModulePromise: Promise<void> | null = null;
+
 type ExtendedCodeClientConfig = google.accounts.oauth2.CodeClientConfig & {
   access_type?: "offline" | "online";
   prompt?: "" | "none" | "consent" | "select_account";
@@ -59,7 +62,15 @@ export async function requestGoogleAuthorizationCode(
     );
   }
 
-  const oauth2 = await waitForGoogleOAuth();
+  const oauth2 =
+    oauthModule ??
+    (window.google?.accounts?.oauth2 as GoogleOAuthModule | undefined);
+
+  if (!oauth2) {
+    throw new Error(
+      "Google Sign-In is still loading. Please wait a moment and try again.",
+    );
+  }
 
   return new Promise<string>((resolve, reject) => {
     let settled = false;
@@ -130,4 +141,22 @@ declare global {
       };
     };
   }
+}
+
+export async function preloadGoogleOAuth() {
+  if (oauthModule) {
+    return;
+  }
+
+  if (!oauthModulePromise) {
+    oauthModulePromise = waitForGoogleOAuth()
+      .then((module) => {
+        oauthModule = module;
+      })
+      .finally(() => {
+        oauthModulePromise = null;
+      });
+  }
+
+  await oauthModulePromise;
 }

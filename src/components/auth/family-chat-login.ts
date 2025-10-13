@@ -17,7 +17,10 @@ import {
   googleClientIdSignal,
   googleConfigErrorSignal,
 } from "@/services/authSessionManager";
-import { requestGoogleAuthorizationCode } from "@/lib/googleIdentity";
+import {
+  preloadGoogleOAuth,
+  requestGoogleAuthorizationCode,
+} from "@/lib/googleIdentity";
 import type { UserProfile } from "@/types";
 
 const SignalElement = SignalWatcher(LitElement) as typeof LitElement;
@@ -186,6 +189,7 @@ export class FamilyChatLogin extends SignalElement {
     await ensureGoogleConfigLoaded();
     this.googleClientId = googleClientIdSignal.get();
     this.googleError = googleConfigErrorSignal.get();
+    await preloadGoogleOAuth();
   }
 
   render() {
@@ -295,8 +299,7 @@ export class FamilyChatLogin extends SignalElement {
       return;
     }
 
-    await ensureGoogleConfigLoaded();
-    const clientId = googleClientIdSignal.get();
+    const clientId = this.googleClientId ?? googleClientIdSignal.get();
     if (!clientId) {
       this.signInError = "Google Sign-In is not configured.";
       return;
