@@ -1,7 +1,10 @@
+import { jwtDecode } from "jwt-decode";
+
 import type { ConfigResponse, JWTPayload, UserProfile } from "@/types";
 
 export const TOKEN_STORAGE_KEY = "familychat_token";
 export const PROFILE_STORAGE_KEY = "familychat_profile";
+export const REFRESH_TOKEN_STORAGE_KEY = "familychat_refresh_token";
 
 export async function fetchConfig(): Promise<ConfigResponse> {
   const response = await fetch(`/config`);
@@ -13,18 +16,7 @@ export async function fetchConfig(): Promise<ConfigResponse> {
 
 export function decodeJwt(token: string): JWTPayload | null {
   try {
-    const payload = token.split(".")[1];
-    if (!payload) {
-      return null;
-    }
-    const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
-    const json = decodeURIComponent(
-      atob(normalized)
-        .split("")
-        .map((char) => `%${`00${char.charCodeAt(0).toString(16)}`.slice(-2)}`)
-        .join(""),
-    );
-    return JSON.parse(json) as JWTPayload;
+    return jwtDecode<JWTPayload>(token);
   } catch {
     return null;
   }
@@ -47,10 +39,19 @@ export function deriveProfile(token: string): UserProfile {
   };
 }
 
-export function saveSession(token: string, profile: UserProfile) {
+export function saveSession(
+  token: string,
+  profile: UserProfile,
+  refreshToken?: string | null,
+) {
   try {
     localStorage.setItem(TOKEN_STORAGE_KEY, token);
     localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(profile));
+    if (refreshToken) {
+      localStorage.setItem(REFRESH_TOKEN_STORAGE_KEY, refreshToken);
+    } else {
+      localStorage.removeItem(REFRESH_TOKEN_STORAGE_KEY);
+    }
   } catch {
     // Ignore storage errors; session persistence is best-effort.
   }
@@ -60,6 +61,7 @@ export function clearSession() {
   try {
     localStorage.removeItem(TOKEN_STORAGE_KEY);
     localStorage.removeItem(PROFILE_STORAGE_KEY);
+    localStorage.removeItem(REFRESH_TOKEN_STORAGE_KEY);
   } catch {
     // Ignore storage errors.
   }
@@ -69,6 +71,7 @@ export function restoreSession(): {
   token: string | null;
   profile: UserProfile;
   expired: boolean;
+  refreshToken: string | null;
 } | null {
   let storedToken: string | null;
   try {
@@ -100,9 +103,17 @@ export function restoreSession(): {
         name: payload?.name,
       };
 
+  let refreshToken: string | null = null;
+  try {
+    refreshToken = localStorage.getItem(REFRESH_TOKEN_STORAGE_KEY);
+  } catch {
+    refreshToken = null;
+  }
+
   return {
     token: expired ? null : storedToken,
     profile,
     expired,
+    refreshToken,
   };
 }
