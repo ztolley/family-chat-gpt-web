@@ -1,3 +1,12 @@
+/**
+ * Lightweight state container for authentication data.
+ *
+ * This module focuses purely on in-memory and persisted state (ID token,
+ * profile, refresh token) using @lit-labs/signals. It intentionally stays free
+ * of network concerns—the actual refresh/exchange logic lives in
+ * authSessionManager.ts so tests and consumers can reason about state changes
+ * without crossing into async flows.
+ */
 import { signal, computed } from "@lit-labs/signals";
 import {
   clearSession,
@@ -7,26 +16,36 @@ import {
 } from "@/lib/authHelpers";
 import type { UserProfile } from "@/types";
 
+// Signals capture the current ID token, profile, and refresh token in-memory.
 export const authTokenSignal = signal<string | null>(null);
 export const authProfileSignal = signal<UserProfile | null>(null);
+export const authRefreshTokenSignal = signal<string | null>(null);
 
+// Derived convenience signal used by the UI for simple auth checks.
 export const isAuthenticatedSignal = computed(
   () => authTokenSignal.get() !== null,
 );
 
-export function setAuthSession(token: string) {
+// setAuthSession updates the reactive state and persists the token bundle.
+export function setAuthSession(token: string, refreshToken?: string | null) {
   const profile = deriveProfile(token);
   authTokenSignal.set(token);
   authProfileSignal.set(profile);
-  saveSession(token, profile);
+  const nextRefreshToken = refreshToken ?? authRefreshTokenSignal.get() ?? null;
+  authRefreshTokenSignal.set(nextRefreshToken);
+  saveSession(token, profile, nextRefreshToken);
 }
 
+// clearAuthSession wipes both the in-memory signals and localStorage.
 export function clearAuthSession() {
   clearSession();
   authTokenSignal.set(null);
   authProfileSignal.set(null);
+  authRefreshTokenSignal.set(null);
 }
 
+// restoreAuthSession reloads any prior session state from storage. It feeds the
+// signals so the rest of the app rehydrates correctly.
 export function restoreAuthSession() {
   const restored = restoreSession();
   if (!restored) {
@@ -34,9 +53,10 @@ export function restoreAuthSession() {
     return "none" as const;
   }
 
-  const { token, profile, expired } = restored;
+  const { token, profile, expired, refreshToken } = restored;
 
   authProfileSignal.set(profile);
+  authRefreshTokenSignal.set(refreshToken);
 
   if (!expired && token) {
     authTokenSignal.set(token);
@@ -47,5 +67,5 @@ export function restoreAuthSession() {
   return "refresh-needed" as const;
 }
 
-// Restore once at module evaluation.
+// Bootstrap the signals on module load so initial renders see any persisted session.
 restoreAuthSession();

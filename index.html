@@ -8,9 +8,17 @@
     <title>FamilyChat Items</title>
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="stylesheet" href="./src/index.css" />
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script type="module" src="/src/main.ts"></script>
+    <style>
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: var(--wa-color-surface-default);
+        color: var(--fc-color-text-primary);
+        font-family: var(--fc-font-family-base);
+      }
+    </style>
   </head>
   <body>
     <family-chat-app></family-chat-app>

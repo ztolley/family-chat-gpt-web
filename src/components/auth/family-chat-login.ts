@@ -4,20 +4,21 @@ import "@awesome.me/webawesome/dist/components/dropdown-item/dropdown-item.js";
 import "@awesome.me/webawesome/dist/components/dropdown/dropdown.js";
 import { LitElement, css, html, nothing } from "lit";
 import { SignalWatcher } from "@lit-labs/signals";
-import { customElement, query, state } from "lit/decorators.js";
+import { customElement, state } from "lit/decorators.js";
 import { effect } from "@/lib/signalHelpers";
 import {
   authProfileSignal,
   authTokenSignal,
   clearAuthSession,
+  setAuthSession,
 } from "@/services/authProvider";
 import {
   ensureGoogleConfigLoaded,
   googleClientIdSignal,
   googleConfigErrorSignal,
 } from "@/services/authSessionManager";
+import { requestGoogleAuthorizationCode } from "@/lib/googleIdentity";
 import type { UserProfile } from "@/types";
-import type { FamilyChatGoogleAuth } from "./family-chat-google-auth";
 
 const SignalElement = SignalWatcher(LitElement) as typeof LitElement;
 
@@ -25,11 +26,9 @@ const SignalElement = SignalWatcher(LitElement) as typeof LitElement;
 export class FamilyChatLogin extends SignalElement {
   @state() private googleClientId: string | null = null;
   @state() private googleError: string | null = null;
-  @query("#google-signin") private googleTarget?: HTMLDivElement;
-  @query("family-chat-google-auth") private googleAuth?: FamilyChatGoogleAuth;
+  @state() private signInPending = false;
+  @state() private signInError: string | null = null;
 
-  private googleButtonReady = false;
-  private lastRenderedClientId: string | null = null;
   private disposeSignalsEffect?: () => void;
 
   static styles = css`
@@ -49,14 +48,6 @@ export class FamilyChatLogin extends SignalElement {
       gap: 0.75rem;
     }
 
-    .google-button {
-      min-height: 40px;
-      min-width: 220px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
     .auth-message {
       color: var(--wa-color-danger-500, #dc2626);
       font-size: 0.75rem;
@@ -64,10 +55,6 @@ export class FamilyChatLogin extends SignalElement {
 
     .account-dropdown {
       display: flex;
-    }
-
-    .avatar-trigger wa-avatar::part(base) {
-      border: 1px solid var(--wa-color-surface-border, #d5d8e0);
     }
 
     .account-menu {
@@ -101,23 +88,9 @@ export class FamilyChatLogin extends SignalElement {
   connectedCallback() {
     super.connectedCallback();
     this.disposeSignalsEffect = effect(() => {
-      const clientId = googleClientIdSignal.get();
-      const error = googleConfigErrorSignal.get();
-      if (this.googleClientId !== clientId) {
-        this.googleClientId = clientId;
-        this.googleButtonReady = false;
-        this.lastRenderedClientId = null;
-        void this.updateComplete.then(() => this.tryRenderGoogleButton());
-      }
-      if (this.googleError !== error) {
-        this.googleError = error;
-      }
-
-      const token = authTokenSignal.get();
-      if (!token && clientId) {
-        this.googleButtonReady = false;
-        void this.updateComplete.then(() => this.tryRenderGoogleButton());
-      }
+      this.googleClientId = googleClientIdSignal.get();
+      this.googleError = googleConfigErrorSignal.get();
+      authTokenSignal.get();
     });
   }
 
@@ -130,8 +103,6 @@ export class FamilyChatLogin extends SignalElement {
     await ensureGoogleConfigLoaded();
     this.googleClientId = googleClientIdSignal.get();
     this.googleError = googleConfigErrorSignal.get();
-    await this.updateComplete;
-    this.tryRenderGoogleButton();
   }
 
   render() {
@@ -158,10 +129,16 @@ export class FamilyChatLogin extends SignalElement {
 
     return html`
       <div class="login-buttons">
-        <div id="google-signin" class="google-button"></div>
-        <family-chat-google-auth></family-chat-google-auth>
-        ${this.googleError
-          ? html`<span class="auth-message">${this.googleError}</span>`
+        <wa-button
+          variant="brand"
+          size="medium"
+          ?loading=${this.signInPending}
+          @click=${this.handleSignIn}
+        >
+          Sign in with Google
+        </wa-button>
+        ${this.signInError
+          ? html`<span class="auth-message">${this.signInError}</span>`
           : nothing}
       </div>
     `;
@@ -197,43 +174,57 @@ export class FamilyChatLogin extends SignalElement {
     `;
   }
 
-  private tryRenderGoogleButton() {
-    if (
-      !this.googleTarget ||
-      !this.googleAuth ||
-      !this.googleClientId ||
-      authTokenSignal.get()
-    ) {
+  private async handleSignIn() {
+    if (this.signInPending) {
       return;
     }
 
-    const clientId = this.googleClientId;
-
-    if (this.googleButtonReady && this.lastRenderedClientId === clientId) {
+    await ensureGoogleConfigLoaded();
+    const clientId = googleClientIdSignal.get();
+    if (!clientId) {
+      this.signInError = "Google Sign-In is not configured.";
       return;
     }
 
-    this.googleAuth
-      .renderButton(this.googleTarget, clientId)
-      .then(() => {
-        this.googleButtonReady = true;
-        this.lastRenderedClientId = clientId;
-        this.googleError = null;
-      })
-      .catch((error) => {
-        const message =
-          error instanceof Error ? error.message : "Google Sign-In failed.";
-        this.googleError = message;
+    this.signInPending = true;
+    this.signInError = null;
+    try {
+      const code = await requestGoogleAuthorizationCode(clientId);
+      const response = await fetch(`/auth/google/token`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ code }),
       });
+
+      if (!response.ok) {
+        const message = await response.text();
+        throw new Error(message || "Failed to exchange authorization code.");
+      }
+
+      const payload = (await response.json()) as {
+        idToken: string;
+        refreshToken?: string | null;
+      };
+
+      setAuthSession(payload.idToken, payload.refreshToken ?? null);
+    } catch (error) {
+      this.signInError =
+        error instanceof Error
+          ? error.message
+          : String(error ?? "Unknown error");
+    } finally {
+      this.signInPending = false;
+    }
   }
 
-  private handleDropdownSelect(event: CustomEvent<{ item: HTMLElement }>) {
+  private async handleDropdownSelect(
+    event: CustomEvent<{ item: HTMLElement }>,
+  ) {
     const value = event.detail.item?.getAttribute?.("value");
     if (value === "logout") {
       clearAuthSession();
-      this.googleButtonReady = false;
-      this.lastRenderedClientId = null;
-      void this.updateComplete.then(() => this.tryRenderGoogleButton());
     }
   }
 

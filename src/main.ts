@@ -1,5 +1,6 @@
 import "@awesome.me/webawesome/dist/styles/webawesome.css";
 import { registerIconLibrary } from "@awesome.me/webawesome/dist/components/icon/library.js";
+import "./components";
 
 const iconModules = import.meta.glob("./assets/icons/*.svg", {
   as: "raw",
@@ -24,5 +25,3 @@ registerIconLibrary("app", {
     return `data:image/svg+xml,${encodeURIComponent(svg)}`;
   },
 });
-
-import "./components";
